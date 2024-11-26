@@ -47,14 +47,14 @@ func FromBytes(data []byte) *Packet {
 		HardwareAddressLength: uint8(data[2]),
 		Hops:                  uint8(data[3]),
 
-		TransactionID: binary.LittleEndian.Uint32(data[4:8]),
-		ElapsedSince:  binary.LittleEndian.Uint16(data[8:10]),
-		Flags:         binary.LittleEndian.Uint16(data[10:12]),
+		TransactionID: binary.BigEndian.Uint32(data[4:8]),
+		ElapsedSince:  binary.BigEndian.Uint16(data[8:10]),
+		Flags:         binary.BigEndian.Uint16(data[10:12]),
 
-		ClientAddress:   binary.LittleEndian.Uint32(data[12:16]),
-		ServerAddress:   binary.LittleEndian.Uint32(data[16:20]),
-		AssignedAddress: binary.LittleEndian.Uint32(data[20:24]),
-		GatewayAddress:  binary.LittleEndian.Uint32(data[24:28]),
+		ClientAddress:   binary.BigEndian.Uint32(data[12:16]),
+		ServerAddress:   binary.BigEndian.Uint32(data[16:20]),
+		AssignedAddress: binary.BigEndian.Uint32(data[20:24]),
+		GatewayAddress:  binary.BigEndian.Uint32(data[24:28]),
 
 		ClientMAC: data[28 : 28+uint8(data[2])], // max is 12 so 28:40
 		Hostname:  data[40:104],
