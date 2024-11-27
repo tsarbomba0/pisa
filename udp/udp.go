@@ -8,33 +8,20 @@ import (
 	"pisa/addresses"
 )
 
-func Checksum(length []byte, src []byte, dest []byte) []byte {
-	var sum uint32 = 0
-	//count := 0
-
-	buf := bytes.NewBuffer(src)
-	buf.Write(dest)
-	buf.Write([]byte{
-		0, 17,
-	})
-	buf.Write(length)
-
-	pseudoHeader := binary.BigEndian.Uint32(buf.Bytes())
-
-	// i think this bad
-	sum = pseudoHeader&0xFFFF + pseudoHeader>>16
-
-	sumBytes := make([]byte, 2)
-	fmt.Println("sum: ", sum)
-	if sum == 0 {
-		sumBytes = []byte{255, 255}
-	} else {
-		binary.BigEndian.PutUint16(sumBytes, uint16(sum))
-	}
-	return sumBytes
+type HeaderUDP struct {
+	SrcPort  uint16
+	DestPort uint16
 }
 
-func Datagram(data []byte, udp *PacketUDP, addr *addresses.Addresses) []byte {
+type pseudoHeader struct {
+	srcAddr  []byte
+	destAddr []byte
+	zeroes   []byte
+	protocol []byte
+	length   []byte
+}
+
+func Datagram(data []byte, udp *HeaderUDP, addr *addresses.Addresses) []byte {
 	// Calculating length
 	dataLength := len(data) + 8
 	if dataLength > 65535 {
@@ -43,26 +30,53 @@ func Datagram(data []byte, udp *PacketUDP, addr *addresses.Addresses) []byte {
 	len := make([]byte, 2)
 	binary.BigEndian.PutUint16(len, uint16(dataLength))
 
-	// Source and destination port to bytes
+	// Source port
 	src := make([]byte, 2)
 	binary.BigEndian.PutUint16(src, udp.SrcPort)
 	buffer := bytes.NewBuffer(src)
-
+	// Destination port
 	dest := make([]byte, 2)
 	binary.BigEndian.PutUint16(dest, udp.DestPort)
 	buffer.Write(dest)
 
+	// Write length
 	buffer.Write(len)
-	buffer.Write(Checksum(len, addr.Source, addr.Destination))
+	buffer.Write([]byte{0, 0})
 	buffer.Write(data)
 
-	fmt.Println("Checksum: ", Checksum(len, addr.Source, addr.Destination))
-	fmt.Println(buffer.Bytes())
+	datagram := buffer.Bytes()
+	fmt.Println("Checksum: ", Checksum(&pseudoHeader{
+		srcAddr:  addr.Source,
+		destAddr: addr.Destination,
+		protocol: []byte{17},
+		length:   len,
+	}, datagram))
 
+	// Return
 	return buffer.Bytes()
 }
 
-type PacketUDP struct {
-	SrcPort  uint16
-	DestPort uint16
+func Checksum(head *pseudoHeader, data []byte) []byte {
+	// sum variable
+	var sum uint16 = 0
+	var n uint16
+	// Pseudo IP header
+	buf := bytes.NewBuffer(head.srcAddr)
+	buf.Write(head.destAddr)
+	buf.Write(head.zeroes)
+	buf.WriteByte(0)
+	buf.WriteByte(17)
+	buf.Write(head.length)
+
+	// UDP Datagram
+	buf.Write(data)
+
+	// Get buffer
+	packet := buf.Bytes()
+
+	for i := 0; i < len(packet); i += 2 {
+		n = binary.BigEndian.Uint16(packet[i : i+2])
+		sum += n&0xFFFF + n>>16
+	}
+	return nil
 }

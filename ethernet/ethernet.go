@@ -10,7 +10,7 @@ import (
 	"syscall"
 )
 
-func SendEthernet(payload []byte, addr *addresses.Addresses, udpinfo *udp.PacketUDP, device net.Interface, targetMAC []byte) error {
+func SendEthernet(payload []byte, addr *addresses.Addresses, udpinfo *udp.HeaderUDP, device net.Interface, targetMAC []byte) error {
 	// Applying the headers
 	udpPacket := udp.Datagram(payload, udpinfo, addr)
 	ipPacket := ipv4.Packet(udpPacket, &ipv4.IP{

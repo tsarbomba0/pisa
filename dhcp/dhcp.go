@@ -88,7 +88,7 @@ func (s *DHCPServer) SendDHCPOffer(p *packet.Packet, dev string) error {
 		Source:      addresses.ParseIP("192.168.0.1"),
 		Destination: addresses.ParseIP("192.168.0.2"),
 	}
-	err = ethernet.SendEthernet(offer.Bytes(), &address, &udp.PacketUDP{
+	err = ethernet.SendEthernet(offer.Bytes(), &address, &udp.HeaderUDP{
 		SrcPort:  67,
 		DestPort: 68,
 	}, *device, p.ClientMAC)
