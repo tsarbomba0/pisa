@@ -2,6 +2,9 @@ package util
 
 import (
 	"encoding/binary"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 var MagicCookie []byte = []byte{99, 130, 83, 99}
@@ -27,4 +30,22 @@ func Uint16Bytes(u uint16) []byte {
 	binary.BigEndian.PutUint16(b, u)
 	return b
 
+}
+
+// Function to test a address
+func CheckAddress(addr string) bool {
+	m, _ := regexp.MatchString(`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`, addr)
+	return m
+}
+
+// Converts a address string into a uint32.
+func AddressIntoUint32(addr string) uint32 {
+	octets := strings.Split(addr, ".")
+
+	var result int = 0
+	for i := 0; i <= 3; i++ {
+		v, _ := strconv.Atoi(octets[i])
+		result += v
+	}
+	return uint32(result)
 }

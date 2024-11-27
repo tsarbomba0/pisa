@@ -46,16 +46,19 @@ func Datagram(data []byte, udp *PacketUDP, addr *addresses.Addresses) []byte {
 	// Source and destination port to bytes
 	src := make([]byte, 2)
 	binary.BigEndian.PutUint16(src, udp.SrcPort)
+	buffer := bytes.NewBuffer(src)
+
 	dest := make([]byte, 2)
 	binary.BigEndian.PutUint16(dest, udp.DestPort)
-
-	buffer := bytes.NewBuffer(src)
 	buffer.Write(dest)
+
 	buffer.Write(len)
 	buffer.Write(Checksum(len, addr.Source, addr.Destination))
 	buffer.Write(data)
+
 	fmt.Println("Checksum: ", Checksum(len, addr.Source, addr.Destination))
 	fmt.Println(buffer.Bytes())
+
 	return buffer.Bytes()
 }
 
