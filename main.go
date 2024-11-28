@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"pisa/dhcp"
 	"pisa/packet"
@@ -15,10 +14,12 @@ import (
 )
 
 func main() {
-	var dhcpOptions map[string]interface{} = make(map[string]interface{})
+	var dhcpOptions map[string]string = make(map[string]string)
 	var device string = ""
 	var rangeFirst uint32
 	var rangeLast uint32
+	var availableOptions []string
+
 	addressRegex := regexp.MustCompile(`\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}-\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}`)
 	// Load config
 	configFile, err := os.Open("config.txt")
@@ -41,6 +42,7 @@ func main() {
 				rangeFirst = util.AddressIntoUint32(addrs[0])
 				rangeLast = util.AddressIntoUint32(addrs[1])
 
+			// interface
 			case "interface":
 				device = entry[1]
 
@@ -48,6 +50,7 @@ func main() {
 			case "router":
 				if util.CheckAddress(entry[1]) {
 					dhcpOptions["router"] = entry[1]
+					availableOptions = append(availableOptions, entry[1])
 				} else {
 					panic(fmt.Errorf("invalid address: " + line))
 				}
@@ -56,6 +59,7 @@ func main() {
 			case "subnetmask":
 				if util.CheckAddress(entry[1]) {
 					dhcpOptions["mask"] = entry[1]
+					availableOptions = append(availableOptions, entry[1])
 				} else {
 					panic(fmt.Errorf("invalid mask: " + line))
 				}
@@ -64,6 +68,7 @@ func main() {
 			case "timesvr":
 				if util.CheckAddress(entry[1]) {
 					dhcpOptions["timesvr"] = entry[1]
+					availableOptions = append(availableOptions, entry[1])
 				} else {
 					panic(fmt.Errorf("invalid Time Server address: " + line))
 				}
@@ -72,6 +77,7 @@ func main() {
 			case "dns":
 				if util.CheckAddress(entry[1]) {
 					dhcpOptions["dns"] = entry[1]
+					availableOptions = append(availableOptions, entry[1])
 				} else {
 					panic(fmt.Errorf("invalid DNS address: " + line))
 				}
@@ -80,45 +86,34 @@ func main() {
 			case "leasetime":
 				time, err := strconv.Atoi(entry[1])
 				util.OnError(err)
+
+				availableOptions = append(availableOptions, entry[1])
 				dhcpOptions["lease"] = time
 
 			default:
+				// Panics if a setting is unknown.
 				panic(fmt.Errorf("unknown setting: " + line))
 			}
 
 		} else {
+			// Panics if a configuration entry isn't in the format of:
+			// key=value
 			panic(fmt.Errorf("invalid configuration entry: " + line))
 		}
 	}
+	// Panics if no interface was provided
 	if device == "" {
 		panic(fmt.Errorf("no interface provided"))
 	}
+
+	// If all went well, logs that the configuration was accepted.
 	log.Println("Loaded the configuration!")
 
-	// Connection
-	s, err := net.ListenUDP("udp", &net.UDPAddr{
-		Port: 67,
-		IP:   net.ParseIP("0.0.0.0"),
-	})
-	util.OnError(err)
-	defer s.Close()
-	reader := bufio.NewReader(s)
+	// Starts the server.
+	Server := dhcp.StartServer(dhcpOptions, rangeFirst, rangeLast, availableOptions)
+	defer Server.SrvConn.Close()
 
-	buffer := make([]byte, 512)
-
-	Server := &dhcp.DHCPServer{
-		SrvConn:     s,
-		Reader:      reader,
-		Buffer:      buffer,
-		Options:     dhcpOptions,
-		Clients:     make(map[uint32]string),
-		RangeFirst:  rangeFirst,
-		RangeLast:   rangeLast,
-		HighestAddr: rangeFirst,
-	}
-
-	// Reading from UDP
-	log.Println("Started server!")
+	// Reading from UDP.
 	for {
 		data, err := Server.Read()
 		if len(data) > 0 {

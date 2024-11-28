@@ -12,7 +12,7 @@ type Packet struct {
 	HardwareAddressLength uint8
 	Hops                  uint8
 
-	TransactionID uint32
+	TransactionID []byte
 	ElapsedSince  uint16
 	Flags         uint16
 
@@ -47,7 +47,7 @@ func FromBytes(data []byte) *Packet {
 		HardwareAddressLength: uint8(data[2]),
 		Hops:                  uint8(data[3]),
 
-		TransactionID: binary.BigEndian.Uint32(data[4:8]),
+		TransactionID: data[4:8],
 		ElapsedSince:  binary.BigEndian.Uint16(data[8:10]),
 		Flags:         binary.BigEndian.Uint16(data[10:12]),
 

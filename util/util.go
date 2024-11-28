@@ -49,3 +49,14 @@ func AddressIntoUint32(addr string) uint32 {
 	}
 	return uint32(result)
 }
+
+// Converts a address string into a byte array.
+func AddressIntoBytearray(addr string) []byte {
+	octets := strings.Split(addr, ".")
+	b := make([]byte, 4)
+	for i := 0; i <= 3; i++ {
+		n, _ := strconv.ParseUint(octets[i], 10, 8)
+		b[i] = byte(n)
+	}
+	return b
+}
