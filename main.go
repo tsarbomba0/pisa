@@ -19,8 +19,10 @@ func main() {
 	var rangeFirst uint32
 	var rangeLast uint32
 	var availableOptions []string
+	var lease uint
 
 	addressRegex := regexp.MustCompile(`\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}-\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}`)
+
 	// Load config
 	configFile, err := os.Open("config.txt")
 	util.OnError(err)
@@ -84,12 +86,9 @@ func main() {
 
 			// Lease time
 			case "leasetime":
-				time, err := strconv.Atoi(entry[1])
+				time, err := strconv.ParseUint(entry[1], 10, 0)
 				util.OnError(err)
-
-				availableOptions = append(availableOptions, entry[1])
-				dhcpOptions["lease"] = time
-
+				lease = uint(time)
 			default:
 				// Panics if a setting is unknown.
 				panic(fmt.Errorf("unknown setting: " + line))
@@ -110,7 +109,7 @@ func main() {
 	log.Println("Loaded the configuration!")
 
 	// Starts the server.
-	Server := dhcp.StartServer(dhcpOptions, rangeFirst, rangeLast, availableOptions)
+	Server := dhcp.StartServer(dhcpOptions, rangeFirst, rangeLast, availableOptions, lease)
 	defer Server.SrvConn.Close()
 
 	// Reading from UDP.
@@ -121,11 +120,12 @@ func main() {
 			switch packet.DHCPAction {
 			case 1:
 				err := Server.SendDHCPOffer(packet, device)
-				if err != nil {
-					log.Println(err)
-				}
+				util.NonFatalError(err)
+			// Client sends DHCP request
 			case 2:
 				fmt.Println("DHCP REQUEST!")
+				err := Server.SendDHCPAck(packet, device)
+				util.NonFatalError(err)
 			}
 		}
 		util.OnError(err)

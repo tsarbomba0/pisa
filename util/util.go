@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/binary"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,6 +14,13 @@ var MagicCookie []byte = []byte{99, 130, 83, 99}
 func OnError(err error) {
 	if err != nil {
 		panic(err)
+	}
+}
+
+// light error handling
+func NonFatalError(err error) {
+	if err != nil {
+		log.Println(err)
 	}
 }
 
