@@ -22,6 +22,7 @@ func main() {
 	var lease uint
 
 	addressRegex := regexp.MustCompile(`\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}-\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}`)
+	rangeRegex := regexp.MustCompile(`.-.`)
 
 	// Load config
 	configFile, err := os.Open("config.txt")
@@ -54,7 +55,7 @@ func main() {
 					dhcpOptions["router"] = entry[1]
 					availableOptions = append(availableOptions, entry[1])
 				} else {
-					panic(fmt.Errorf("invalid address: " + line))
+					log.Panic("Invalid  Router address entry: " + line)
 				}
 
 			// Subnet Mask
@@ -63,7 +64,7 @@ func main() {
 					dhcpOptions["mask"] = entry[1]
 					availableOptions = append(availableOptions, entry[1])
 				} else {
-					panic(fmt.Errorf("invalid mask: " + line))
+					log.Panic("Invalid Subnet Mask entry: " + line)
 				}
 
 			// Time server
@@ -72,7 +73,7 @@ func main() {
 					dhcpOptions["timesvr"] = entry[1]
 					availableOptions = append(availableOptions, entry[1])
 				} else {
-					panic(fmt.Errorf("invalid Time Server address: " + line))
+					log.Panic("Invalid Time Server entry: " + line)
 				}
 
 			// Domain Name server
@@ -81,7 +82,7 @@ func main() {
 					dhcpOptions["dns"] = entry[1]
 					availableOptions = append(availableOptions, entry[1])
 				} else {
-					panic(fmt.Errorf("invalid DNS address: " + line))
+					log.Panic("Invalid DNS entry: " + line)
 				}
 
 			// Lease time
@@ -117,13 +118,15 @@ func main() {
 		data, err := Server.Read()
 		if len(data) > 0 {
 			packet := packet.FromBytes(data)
+			// Client sends DHCP discover
 			switch packet.DHCPAction {
 			case 1:
+				log.Println(packet.StringMAC + ": Got DHCPDiscover, sent DHCPOffer")
 				err := Server.SendDHCPOffer(packet, device)
 				util.NonFatalError(err)
 			// Client sends DHCP request
 			case 2:
-				fmt.Println("DHCP REQUEST!")
+				log.Println(packet.StringMAC + ": Got DHCPRequest, sent DHCPAck")
 				err := Server.SendDHCPAck(packet, device)
 				util.NonFatalError(err)
 			}
