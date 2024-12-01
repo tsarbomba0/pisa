@@ -22,7 +22,7 @@ func main() {
 	var lease uint
 
 	addressRegex := regexp.MustCompile(`\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}-\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}`)
-	rangeRegex := regexp.MustCompile(`.-.`)
+	//rangeRegex := regexp.MustCompile(`.-.`)
 
 	// Load config
 	configFile, err := os.Open("config.txt")
@@ -51,39 +51,55 @@ func main() {
 
 			// Router
 			case "router":
-				if util.CheckAddress(entry[1]) {
-					dhcpOptions["router"] = entry[1]
-					availableOptions = append(availableOptions, entry[1])
-				} else {
-					log.Panic("Invalid  Router address entry: " + line)
+				addressSlice := strings.Split(entry[1], ",")
+				if len(addressSlice) > 1 {
+					for i := 0; i <= len(addressSlice); i++ {
+						if !util.CheckAddress(addressSlice[i]) {
+							log.Panic("Invalid address entry: " + addressSlice[i])
+						}
+					}
 				}
+				dhcpOptions[entry[0]] = entry[1]
+				availableOptions = append(availableOptions, entry[0])
 
 			// Subnet Mask
 			case "subnetmask":
-				if util.CheckAddress(entry[1]) {
-					dhcpOptions["mask"] = entry[1]
-					availableOptions = append(availableOptions, entry[1])
-				} else {
-					log.Panic("Invalid Subnet Mask entry: " + line)
+				addressSlice := strings.Split(entry[1], ",")
+				if len(addressSlice) > 1 {
+					for i := 0; i <= len(addressSlice); i++ {
+						if !util.CheckAddress(addressSlice[i]) {
+							log.Panic("Invalid address entry: " + addressSlice[i])
+						}
+					}
 				}
+				dhcpOptions[entry[0]] = entry[1]
+				availableOptions = append(availableOptions, entry[0])
 
 			// Time server
 			case "timesvr":
-				if util.CheckAddress(entry[1]) {
-					dhcpOptions["timesvr"] = entry[1]
-					availableOptions = append(availableOptions, entry[1])
-				} else {
-					log.Panic("Invalid Time Server entry: " + line)
+				addressSlice := strings.Split(entry[1], ",")
+				if len(addressSlice) > 1 {
+					for i := 0; i <= len(addressSlice); i++ {
+						if !util.CheckAddress(addressSlice[i]) {
+							log.Panic("Invalid address entry: " + addressSlice[i])
+						}
+					}
 				}
+				dhcpOptions[entry[0]] = entry[1]
+				availableOptions = append(availableOptions, entry[0])
 
 			// Domain Name server
 			case "dns":
-				if util.CheckAddress(entry[1]) {
-					dhcpOptions["dns"] = entry[1]
-					availableOptions = append(availableOptions, entry[1])
-				} else {
-					log.Panic("Invalid DNS entry: " + line)
+				addressSlice := strings.Split(entry[1], ",")
+				if len(addressSlice) > 1 {
+					for i := 0; i <= len(addressSlice); i++ {
+						if !util.CheckAddress(addressSlice[i]) {
+							log.Panic("Invalid address entry: " + addressSlice[i])
+						}
+					}
 				}
+				dhcpOptions[entry[0]] = entry[1]
+				availableOptions = append(availableOptions, entry[0])
 
 			// Lease time
 			case "leasetime":

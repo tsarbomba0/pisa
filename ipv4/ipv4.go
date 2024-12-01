@@ -3,9 +3,11 @@ package ipv4
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"pisa/addresses"
 )
 
+// Struct representing a part of the IP header
 type IP struct {
 	Protocol uint8
 	Addr     *addresses.Addresses
@@ -13,22 +15,28 @@ type IP struct {
 }
 
 // Function to calculate the IP checksum
-func IPChecksum(header []byte) []byte {
+//
+// Takes a []byte as input, returns a []byte
+func IPChecksum(header []byte, src []byte, dest []byte) []byte {
 	var sum uint32 = 0
-	var count int = 0
 	var sumBytes []byte = make([]byte, 2)
+	length := len(header)
 
-	for count > len(header)-1 {
-		sum = sum + uint32(header[count])
-		count++
+	// add all 16-bit words of the header to a sum as uint32
+	for i := 0; i <= length-1; i += 2 {
+		sum += uint32(header[i] + header[i+1])
+		fmt.Println(sum)
 	}
 
-	for (sum >> 16) != 0 {
+	// the sum is shortened to 16 bits and the overflow is added to the end
+	for sum > 0xffff {
 		sum = (sum & 0xffff) + sum>>16
 	}
 
-	binary.LittleEndian.PutUint16(sumBytes, uint16(^sum))
-
+	fmt.Println("CHECK", sum)
+	// Turns it into a byte array
+	binary.BigEndian.PutUint16(sumBytes, uint16(^sum))
+	fmt.Println(sumBytes)
 	return sumBytes
 
 }
@@ -53,8 +61,8 @@ func Packet(data []byte, ip *IP) []byte {
 		ip.Protocol, // udp is 17
 	})
 
-	// at first a empty checksum field, later filled out
-	buf.Write(make([]byte, 2))
+	// checksum
+	buf.Write([]byte{0, 0})
 
 	// Source and destination address
 	buf.Write(ip.Addr.Source)
@@ -62,8 +70,8 @@ func Packet(data []byte, ip *IP) []byte {
 
 	// Checksum
 	b := buf.Bytes()
-	//checksum := IPChecksum(b)
-	//copy(b[8:10], checksum)
+	checksum := IPChecksum(b, ip.Addr.Source, ip.Addr.Destination)
+	copy(b[10:12], checksum)
 
-	return append(b, data...)
+	return append(buf.Bytes(), data...)
 }

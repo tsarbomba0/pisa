@@ -118,23 +118,34 @@ func StartServer(options map[string]string, rangeFirst uint32, rangeLast uint32,
 // I will include that later.
 func (s *DHCPServer) createOptions() {
 	optBuffer := new(bytes.Buffer)
+
 	for i := 0; i < len(s.availableOptions)-1; i++ {
 		value := s.Options[s.availableOptions[i]]
 		switch s.availableOptions[i] {
+
 		case "router":
-			optBuffer.Write([]byte{3, 4})
+			optBuffer.Write([]byte{3, byte(len(value) * 4)})
+			for i := 0; i <= len(value); i++ {
+				optBuffer.Write(util.AddressIntoBytearray(value))
+			}
 
 		case "subnetmask":
-			optBuffer.Write([]byte{1, 4})
-			optBuffer.Write(util.AddressIntoBytearray(value))
+			optBuffer.Write([]byte{1, byte(len(value) * 4)})
+			for i := 0; i <= len(value); i++ {
+				optBuffer.Write(util.AddressIntoBytearray(value))
+			}
 
 		case "dns":
-			optBuffer.Write([]byte{6, 4})
-			optBuffer.Write(util.AddressIntoBytearray(value))
+			optBuffer.Write([]byte{6, byte(len(value) * 4)})
+			for i := 0; i <= len(value); i++ {
+				optBuffer.Write(util.AddressIntoBytearray(value))
+			}
 
 		case "timesvr":
-			optBuffer.Write([]byte{4, 4})
-			optBuffer.Write(util.AddressIntoBytearray(value))
+			optBuffer.Write([]byte{4, byte(len(value) * 4)})
+			for i := 0; i <= len(value); i++ {
+				optBuffer.Write(util.AddressIntoBytearray(value))
+			}
 		}
 
 	}
@@ -212,7 +223,10 @@ func (s *DHCPServer) SendDHCPAck(packet *packet.Packet, dev string) error {
 	// transaction id
 	ack.Write(packet.TransactionID)
 	// secs and flags
-	ack.Write([]byte{0, 0})
+	ack.Write([]byte{
+		0, 0,
+		0, 0,
+	})
 
 	ack.Write([]byte{
 		0, 0, 0, 0, // client ip

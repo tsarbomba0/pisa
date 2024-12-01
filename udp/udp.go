@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"pisa/addresses"
 )
 
@@ -94,6 +93,6 @@ func Checksum(head *pseudoHeader, data []byte) []byte {
 
 	result := make([]byte, 2)
 	binary.BigEndian.PutUint16(result, uint16(sum))
-	fmt.Println("checksum", result)
+	//fmt.Println("checksum", result)
 	return result
 }
