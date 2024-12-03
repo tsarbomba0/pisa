@@ -4,46 +4,28 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"pisa/addresses"
+	"pisa/util"
 )
 
-// Struct representing a part of the IP header
-type IP struct {
-	Protocol uint8
-	Addr     *addresses.Addresses
-	TTL      uint8
+// Struct for an IP Header (No options)
+type IPv4Header struct {
+	HeaderLen       byte
+	TotalLength     uint16
+	Identification  uint16
+	Flags           byte
+	FragOffset      uint16
+	TTL             byte
+	Protocol        byte
+	Checksum        uint16
+	SourceAddr      []byte
+	DestinationAddr []byte
 }
 
-// Function to calculate the IP checksum
+// Function to create packets "fast"
 //
-// Takes a []byte as input, returns a []byte
-func IPChecksum(header []byte, src []byte, dest []byte) []byte {
-	var sum uint32 = 0
-	var sumBytes []byte = make([]byte, 2)
-	length := len(header)
-
-	// add all 16-bit words of the header to a sum as uint32
-	for i := 0; i <= length-1; i += 2 {
-		sum += uint32(header[i] + header[i+1])
-		fmt.Println(sum)
-	}
-
-	// the sum is shortened to 16 bits and the overflow is added to the end
-	for sum > 0xffff {
-		sum = (sum & 0xffff) + sum>>16
-	}
-
-	fmt.Println("CHECK", sum)
-	// Turns it into a byte array
-	binary.BigEndian.PutUint16(sumBytes, uint16(^sum))
-	fmt.Println(sumBytes)
-	return sumBytes
-
-}
-
-// Creates a IP Packet
-func Packet(data []byte, ip *IP) []byte {
-	buf := bytes.NewBuffer([]byte{
+// Ignores stuff like identification, flags, fragmanting, diffserv or ecn.
+func CreateFastPacket(h *IPv4Header, data []byte) []byte {
+	packetBuf := bytes.NewBuffer([]byte{
 		69, // Version + IHL
 		0,  // DiffServ + ECN
 	})
@@ -51,27 +33,61 @@ func Packet(data []byte, ip *IP) []byte {
 	length := make([]byte, 2)
 	binary.BigEndian.PutUint16(length, uint16(len(data)+24))
 
-	// length
-	buf.Write(length)
-
-	buf.Write([]byte{
-		0, 0, // identification, not used here
-		0, 0, // flags 3 bits fragment offset 13 bits
-		ip.TTL,      // ttl
-		ip.Protocol, // udp is 17
+	packetBuf.Write(length)
+	packetBuf.Write([]byte{
+		0, 0, // identification
+		0, 0, // flags and fragment offset
+		h.TTL,
+		h.Protocol,
+		0, 0,
 	})
 
-	// checksum
-	buf.Write([]byte{0, 0})
-
-	// Source and destination address
-	buf.Write(ip.Addr.Source)
-	buf.Write(ip.Addr.Destination)
+	// addresses
+	packetBuf.Write(h.SourceAddr)
+	packetBuf.Write(h.DestinationAddr)
 
 	// Checksum
-	b := buf.Bytes()
-	checksum := IPChecksum(b, ip.Addr.Source, ip.Addr.Destination)
-	copy(b[10:12], checksum)
+	b := packetBuf.Bytes()
 
-	return append(buf.Bytes(), data...)
+	checksumBytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(checksumBytes, checksum(b))
+
+	copy(b[10:12], checksumBytes)
+
+	err := verifyChecksum(b)
+	util.NonFatalError(err)
+
+	return append(b, data...)
+}
+
+// Creates a Internet Checksum.
+func checksum(header []byte) uint16 {
+	var length int = len(header)
+	var sum uint32
+	for i := 0; i <= length-1; i += 2 {
+		sum += uint32(header[i]) << 8
+		sum += uint32(header[i+1])
+	}
+	return ^uint16(sum&0xffff + sum>>16)
+}
+
+// Verifies a checksum.
+func verifyChecksum(header []byte) error {
+	var length int = len(header)
+	var sum uint32
+
+	for i := 0; i <= length-1; i += 2 {
+		sum += uint32(header[i]) << 8
+		sum += uint32(header[i+1])
+	}
+	if length%2 == 1 {
+		sum += uint32(header[length-1]) << 8
+	}
+
+	result := uint16(sum>>16 + sum&0xFFFF)
+	if result == 0xFFFF {
+		return nil
+	} else {
+		return fmt.Errorf("wrong checksum: %d", ^result)
+	}
 }

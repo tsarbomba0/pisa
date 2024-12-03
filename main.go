@@ -134,6 +134,7 @@ func main() {
 		data, err := Server.Read()
 		if len(data) > 0 {
 			packet := packet.FromBytes(data)
+			fmt.Println(packet.DHCPAction)
 			// Client sends DHCP discover
 			switch packet.DHCPAction {
 			case 1:
@@ -141,7 +142,7 @@ func main() {
 				err := Server.SendDHCPOffer(packet, device)
 				util.NonFatalError(err)
 			// Client sends DHCP request
-			case 2:
+			case 3:
 				log.Println(packet.StringMAC + ": Got DHCPRequest, sent DHCPAck")
 				err := Server.SendDHCPAck(packet, device)
 				util.NonFatalError(err)

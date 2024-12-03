@@ -33,6 +33,7 @@ func Datagram(data []byte, udp *HeaderUDP, addr *addresses.Addresses) []byte {
 	src := make([]byte, 2)
 	binary.BigEndian.PutUint16(src, udp.SrcPort)
 	buffer := bytes.NewBuffer(src)
+
 	// Destination port
 	dest := make([]byte, 2)
 	binary.BigEndian.PutUint16(dest, udp.DestPort)
@@ -40,15 +41,17 @@ func Datagram(data []byte, udp *HeaderUDP, addr *addresses.Addresses) []byte {
 
 	// Write length
 	buffer.Write(len)
+
 	// 2 zero bytes as checksum
 	buffer.Write([]byte{0, 0})
+
 	// data
 	buffer.Write(data)
 
 	datagram := buffer.Bytes()
 
 	// Checksum into bytearray
-	copy(datagram[6:8], Checksum(&pseudoHeader{
+	copy(datagram[6:8], checksum(&pseudoHeader{
 		srcAddr:  addr.Source,
 		destAddr: addr.Destination,
 		protocol: []byte{17},
@@ -59,9 +62,8 @@ func Datagram(data []byte, udp *HeaderUDP, addr *addresses.Addresses) []byte {
 	return datagram
 }
 
-func Checksum(head *pseudoHeader, data []byte) []byte {
-	// sum variable
-	var sum uint32 = 0
+// This creates a UDP Checksum.
+func checksum(head *pseudoHeader, data []byte) []byte {
 
 	// Pseudo IP header
 	buf := bytes.NewBuffer(head.srcAddr)
@@ -78,21 +80,17 @@ func Checksum(head *pseudoHeader, data []byte) []byte {
 	packet := buf.Bytes()
 	length := len(packet)
 
-	for i := 0; i < length-1; i += 2 {
-		sum += uint32(packet[i])
+	var sum uint32
+	for i := 0; i <= len(packet)-1; i += 2 {
+		sum += uint32(packet[i]) << 8
 		sum += uint32(packet[i+1])
 	}
 
 	if length%2 == 1 {
-		sum += uint32(packet[length])
+		sum += uint32(packet[length-1])
 	}
 
-	for sum > 0xFFFF {
-		sum = sum&0xFFFF + sum>>16
-	}
-
-	result := make([]byte, 2)
-	binary.BigEndian.PutUint16(result, uint16(sum))
-	//fmt.Println("checksum", result)
-	return result
+	checksumBytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(checksumBytes, ^uint16(sum&0xffff+sum>>16))
+	return checksumBytes
 }

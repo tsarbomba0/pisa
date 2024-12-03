@@ -13,11 +13,12 @@ import (
 func SendEthernet(payload []byte, addr *addresses.Addresses, udpinfo *udp.HeaderUDP, device net.Interface, targetMAC []byte) error {
 	// Applying the headers
 	udpPacket := udp.Datagram(payload, udpinfo, addr)
-	ipPacket := ipv4.Packet(udpPacket, &ipv4.IP{
-		Protocol: 17,
-		Addr:     addr,
-		TTL:      128,
-	})
+	ipPacket := ipv4.CreateFastPacket(&ipv4.IPv4Header{
+		SourceAddr:      addr.Source,
+		DestinationAddr: addr.Destination,
+		Protocol:        17,
+		TTL:             64,
+	}, udpPacket)
 
 	// Destination and Source MAC
 	ethernetPacket := bytes.NewBuffer(targetMAC)
@@ -70,5 +71,4 @@ func SendEthernet(payload []byte, addr *addresses.Addresses, udpinfo *udp.Header
 	}
 
 	return err
-
 }

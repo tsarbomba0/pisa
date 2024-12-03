@@ -54,7 +54,7 @@ func (s *DHCPServer) Read() ([]byte, error) {
 
 // Generates an IP address.
 func (s *DHCPServer) generateAddress() []byte {
-	fmt.Println("Highest", s.HighestAddr)
+	//fmt.Println("Highest", s.HighestAddr)
 	s.HighestAddr += 1
 	temporary := s.HighestAddr
 	address := make([]byte, 4)
@@ -175,9 +175,9 @@ func (s *DHCPServer) SendDHCPOffer(p *packet.Packet, dev string) error {
 	offer.Write([]byte{
 		0, 0, // SECONDS
 		0, 0, // FLAGS
-		192, 168, 0, 2, // CLIENT IP
-		192, 168, 0, 1, // YOUR IP
-		0, 0, 0, 0, // NEXT SERVERIP
+		0, 0, 0, 0, // CLIENT IP
+		ip[0], ip[1], ip[2], ip[3], // YOUR IP
+		192, 168, 0, 1, // SERVER IP
 		0, 0, 0, 0, // GATEWAY IP
 	})
 
@@ -190,7 +190,7 @@ func (s *DHCPServer) SendDHCPOffer(p *packet.Packet, dev string) error {
 	offer.Write(make([]byte, 128))
 
 	// Append options rn not ready
-	offer.Write(make([]byte, 192))
+	offer.Write(s.parsedOptions)
 
 	// Send frame directory to the specified interface
 	device, err := net.InterfaceByName(dev)
@@ -205,9 +205,6 @@ func (s *DHCPServer) SendDHCPOffer(p *packet.Packet, dev string) error {
 		SrcPort:  67,
 		DestPort: 68,
 	}, *device, p.ClientMAC)
-
-	// Log
-	log.Println("Sent DHCPOffer to a client!")
 
 	return err
 }

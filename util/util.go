@@ -49,13 +49,13 @@ func CheckAddress(addr string) bool {
 // Converts a address string into a uint32.
 func AddressIntoUint32(addr string) uint32 {
 	octets := strings.Split(addr, ".")
-
-	var result int = 0
+	b := make([]byte, 4)
 	for i := 0; i <= 3; i++ {
 		v, _ := strconv.Atoi(octets[i])
-		result += v
+		b[i] = byte(v)
 	}
-	return uint32(result)
+
+	return binary.BigEndian.Uint32(b)
 }
 
 // Converts a address string into a byte array.
