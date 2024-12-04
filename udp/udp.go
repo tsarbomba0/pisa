@@ -26,37 +26,36 @@ func Datagram(data []byte, udp *HeaderUDP, addr *addresses.Addresses) []byte {
 	if dataLength > 65535 {
 		panic(errors.New("packet too large"))
 	}
-	len := make([]byte, 2)
-	binary.BigEndian.PutUint16(len, uint16(dataLength))
+
+	// Length
+	length := make([]byte, 2)
+	binary.BigEndian.PutUint16(length, uint16(dataLength))
 
 	// Source port
 	src := make([]byte, 2)
 	binary.BigEndian.PutUint16(src, udp.SrcPort)
-	buffer := bytes.NewBuffer(src)
 
 	// Destination port
 	dest := make([]byte, 2)
 	binary.BigEndian.PutUint16(dest, udp.DestPort)
-	buffer.Write(dest)
 
-	// Write length
-	buffer.Write(len)
+	var header []byte = []byte{
+		src[0], src[1],
+		dest[0], dest[1],
+		length[0], length[1],
+		0, 0,
+	}
 
-	// 2 zero bytes as checksum
-	buffer.Write([]byte{0, 0})
-
-	// data
-	buffer.Write(data)
-
-	datagram := buffer.Bytes()
+	// datagram
+	datagram := append(header, data...)
 
 	// Checksum into bytearray
-	copy(datagram[6:8], checksum(&pseudoHeader{
-		srcAddr:  addr.Source,
-		destAddr: addr.Destination,
-		protocol: []byte{17},
-		length:   len,
-	}, datagram))
+	//copy(datagram[6:8], checksum(&pseudoHeader{
+	//	srcAddr:  addr.Source,
+	//	destAddr: addr.Destination,
+	//	protocol: []byte{17},
+	//	length:   length,
+	//}, datagram))
 
 	// Return
 	return datagram
@@ -79,14 +78,13 @@ func checksum(head *pseudoHeader, data []byte) []byte {
 	// Get buffer and length
 	packet := buf.Bytes()
 	length := len(packet)
-
 	var sum uint32
-	for i := 0; i <= len(packet)-1; i += 2 {
+	for i := 0; i <= length-2; i++ {
 		sum += uint32(packet[i]) << 8
 		sum += uint32(packet[i+1])
 	}
 
-	if length%2 == 1 {
+	if length == 1 {
 		sum += uint32(packet[length-1])
 	}
 

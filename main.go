@@ -14,12 +14,11 @@ import (
 )
 
 func main() {
-	var dhcpOptions map[string]string = make(map[string]string)
-	var device string = ""
 	var rangeFirst uint32
 	var rangeLast uint32
 	var availableOptions []string
-	var lease uint
+
+	var dhcpOptions dhcp.DHCPOptions
 
 	addressRegex := regexp.MustCompile(`\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}-\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}`)
 	//rangeRegex := regexp.MustCompile(`.-.`)
@@ -47,7 +46,8 @@ func main() {
 
 			// interface
 			case "interface":
-				device = entry[1]
+				availableOptions = append(availableOptions, entry[0])
+				dhcpOptions.Interface = entry[1]
 
 			// Router
 			case "router":
@@ -59,7 +59,7 @@ func main() {
 						}
 					}
 				}
-				dhcpOptions[entry[0]] = entry[1]
+				dhcpOptions.Router = addressSlice
 				availableOptions = append(availableOptions, entry[0])
 
 			// Subnet Mask
@@ -72,7 +72,7 @@ func main() {
 						}
 					}
 				}
-				dhcpOptions[entry[0]] = entry[1]
+				dhcpOptions.SubnetMask = entry[1]
 				availableOptions = append(availableOptions, entry[0])
 
 			// Time server
@@ -85,7 +85,7 @@ func main() {
 						}
 					}
 				}
-				dhcpOptions[entry[0]] = entry[1]
+				dhcpOptions.TimeServer = addressSlice
 				availableOptions = append(availableOptions, entry[0])
 
 			// Domain Name server
@@ -98,14 +98,15 @@ func main() {
 						}
 					}
 				}
-				dhcpOptions[entry[0]] = entry[1]
+				dhcpOptions.DNS = addressSlice
 				availableOptions = append(availableOptions, entry[0])
 
 			// Lease time
-			case "leasetime":
+			case "lease":
 				time, err := strconv.ParseUint(entry[1], 10, 0)
 				util.OnError(err)
-				lease = uint(time)
+				dhcpOptions.Lease = uint(time)
+				availableOptions = append(availableOptions, entry[0])
 			default:
 				// Panics if a setting is unknown.
 				panic(fmt.Errorf("unknown setting: " + line))
@@ -118,7 +119,7 @@ func main() {
 		}
 	}
 	// Panics if no interface was provided
-	if device == "" {
+	if dhcpOptions.Interface == "" {
 		panic(fmt.Errorf("no interface provided"))
 	}
 
@@ -126,7 +127,7 @@ func main() {
 	log.Println("Loaded the configuration!")
 
 	// Starts the server.
-	Server := dhcp.StartServer(dhcpOptions, rangeFirst, rangeLast, availableOptions, lease)
+	Server := dhcp.StartServer(&dhcpOptions, rangeFirst, rangeLast, availableOptions)
 	defer Server.SrvConn.Close()
 
 	// Reading from UDP.
@@ -139,12 +140,12 @@ func main() {
 			switch packet.DHCPAction {
 			case 1:
 				log.Println(packet.StringMAC + ": Got DHCPDiscover, sent DHCPOffer")
-				err := Server.SendDHCPOffer(packet, device)
+				err := Server.SendDHCPOffer(packet)
 				util.NonFatalError(err)
 			// Client sends DHCP request
 			case 3:
 				log.Println(packet.StringMAC + ": Got DHCPRequest, sent DHCPAck")
-				err := Server.SendDHCPAck(packet, device)
+				err := Server.SendDHCPAck(packet)
 				util.NonFatalError(err)
 			}
 		}
