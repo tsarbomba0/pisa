@@ -79,7 +79,7 @@ func checksum(head *pseudoHeader, data []byte) []byte {
 	packet := buf.Bytes()
 	length := len(packet)
 	var sum uint32
-	for i := 0; i <= length-2; i++ {
+	for i := 0; i <= length-1; i += 2 {
 		sum += uint32(packet[i]) << 8
 		sum += uint32(packet[i+1])
 	}

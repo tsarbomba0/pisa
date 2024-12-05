@@ -45,6 +45,9 @@ type DHCPServer struct {
 
 	// Local address represented as []byte
 	LocalAddress []byte
+
+	// Released addresses in []uint32
+	ReleasedAddresses []uint32
 	// Options actually set in the configuration.
 	availableOptions []string
 
@@ -65,7 +68,6 @@ func (s *DHCPServer) Read() ([]byte, error) {
 // Generates an IP address.
 func (s *DHCPServer) generateAddress(mac string) []byte {
 	address := make([]byte, 4)
-	s.Clients[mac] = s.HighestAddr
 	binary.BigEndian.PutUint32(address, s.HighestAddr)
 	s.HighestAddr += 1
 	return address
@@ -108,20 +110,21 @@ func StartServer(opt *DHCPOptions, rangeFirst uint32, rangeLast uint32, availabl
 		Buffer:  buffer,
 
 		// Related to configuration
-		Options:          opt,
-		RangeFirst:       rangeFirst,
-		RangeLast:        rangeLast,
-		HighestAddr:      rangeFirst,
-		availableOptions: availableOptions,
-		Clients:          make(map[string]uint32),
-		LocalAddress:     addresses.ParseIP(address[0]),
+		Options:           opt,
+		RangeFirst:        rangeFirst,
+		RangeLast:         rangeLast,
+		HighestAddr:       rangeFirst,
+		availableOptions:  availableOptions,
+		Clients:           make(map[string]uint32),
+		LocalAddress:      addresses.ParseIP(address[0]),
+		ReleasedAddresses: make([]uint32),
 	}
 
 	// Sets a ready byte array of options.
 	Server.createOptions(opt)
 
 	// Logging.
-	log.Println("Started server!")
+	log.Println("Started server on address:", address[0], "!")
 
 	return Server
 }
@@ -133,6 +136,7 @@ func StartServer(opt *DHCPOptions, rangeFirst uint32, rangeLast uint32, availabl
 // I will include that later.
 func (s *DHCPServer) createOptions(opt *DHCPOptions) {
 	optBuffer := new(bytes.Buffer)
+	optBuffer.Write(util.MagicCookie)
 	for i := 0; i <= len(s.availableOptions)-1; i++ {
 		fmt.Println(s.availableOptions[i])
 		switch s.availableOptions[i] {
@@ -181,9 +185,6 @@ func (s *DHCPServer) createOptions(opt *DHCPOptions) {
 
 	// Padding with 0s
 	//optBuffer.Write(make([]byte, 191-len(optBuffer.Bytes())))
-	// Option 255: End
-	optBuffer.WriteByte(255)
-	fmt.Println(optBuffer.Bytes())
 	s.parsedOptions = optBuffer.Bytes()
 }
 
@@ -193,15 +194,31 @@ func (s *DHCPServer) createOptions(opt *DHCPOptions) {
 func (s *DHCPServer) SendDHCPOffer(p *packet.Packet) error {
 	offer := new(bytes.Buffer)
 
-	// Generate a IP address from the ranges
-	ip := s.generateAddress(p.StringMAC)
+	// Generate a IP address from the ranges.
+	if s.RangeFirst+1 > s.RangeLast {
+		return fmt.Errorf("Address range exhausted!")
+	}
+	var ip []byte
+	if s.Clients[p.StringMAC] == 0 {
+		if len(s.ReleasedAddresses) > 0 {
+			ip = s.ReleasedAddresses[0]
+			s.ReleasedAddresses = s.ReleasedAddresses[1:]
+		} else {
+			ip = s.generateAddress(p.StringMAC)
+			s.Clients[mac] = s.HighestAddr
+		}
+	} else {
+		ip = util.Uint32Bytes(s.Clients[p.StringMAC])
+	}
 
+	// opcode, htype, hlen, hops
 	offer.Write([]byte{
 		2, 1, 6, 0,
 	})
 
+	// Transaction ID
 	offer.Write(p.TransactionID)
-	fmt.Println("IP", ip)
+
 	// Fields
 	offer.Write([]byte{
 		0, 0, // SECONDS
@@ -218,11 +235,12 @@ func (s *DHCPServer) SendDHCPOffer(p *packet.Packet) error {
 	// server hostname not needed, will be added
 	offer.Write(make([]byte, 64))
 	// bootfile
-	offer.Write(make([]byte, 128))
+	offer.Write(make([]byte, 138))
 
-	// Append options rn not ready
+	// Append options
 	offer.Write(s.parsedOptions)
-
+	// Option 53: DHCP Message type and Option 255 End
+	offer.Write([]byte{53, 1, 2, 255})
 	// Send frame directory to the specified interface
 	device, err := net.InterfaceByName(s.Options.Interface)
 	util.OnError(err)
@@ -252,12 +270,16 @@ func (s *DHCPServer) SendDHCPAck(packet *packet.Packet) error {
 	// transaction id
 	ack.Write(packet.TransactionID)
 
+	assignedAddr := s.Clients[packet.StringMAC]
+
 	ack.Write([]byte{
 		0, 0,
 		0, 0,
-		0, 0, 0, 0, // client ip
-		192, 168, 0, 1, // your ip
-		s.LocalAddress[0], s.LocalAddress[1], s.LocalAddress[2], s.LocalAddress[4], // SERVER IP
+		0, 0, 0, 0,
+	})
+	binary.Write(ack, binary.BigEndian, assignedAddr)
+	ack.Write([]byte{
+		s.LocalAddress[0], s.LocalAddress[1], s.LocalAddress[2], s.LocalAddress[3], // SERVER IP
 		0, 0, 0, 0, // gateway ip
 	})
 
@@ -266,11 +288,11 @@ func (s *DHCPServer) SendDHCPAck(packet *packet.Packet) error {
 
 	// Server hostname
 	ack.Write(make([]byte, 64))
-
-	// Write Magic Cookie at the start
-	ack.Write(util.MagicCookie)
-	// Options
+	// Bootfile
+	ack.Write(make([]byte, 138))
+	// Option 53: DHCP Message type and Option 255 End
 	ack.Write(s.parsedOptions)
+	ack.Write([]byte{53, 1, 5, 255})
 
 	// Send frame directory to the specified interface
 	device, err := net.InterfaceByName(s.Options.Interface)
@@ -278,8 +300,8 @@ func (s *DHCPServer) SendDHCPAck(packet *packet.Packet) error {
 
 	// Source Destination address pair
 	address := addresses.Addresses{
-		Source:      addresses.ParseIP("192.168.0.1"),
-		Destination: addresses.ParseIP("192.168.0.2"),
+		Source:      s.LocalAddress,
+		Destination: util.Uint32Bytes(assignedAddr),
 	}
 	// Write to the socket.
 	err = ethernet.SendEthernet(ack.Bytes(), &address, &udp.HeaderUDP{
@@ -287,5 +309,11 @@ func (s *DHCPServer) SendDHCPAck(packet *packet.Packet) error {
 		DestPort: 68,
 	}, *device, packet.ClientMAC)
 
+	log.Println("DHCPACK to: ", packet.StringMAC)
 	return err
+}
+
+func (s *DHCPserver) Release(p *packet.Packet) {
+	s.Clients[p.StringMAC] = 0
+	s.ReleasedAddresses = append(s.ReleasedAddresses, binary.BigEndian.Uint32(p.YourAddress))
 }

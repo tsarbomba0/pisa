@@ -16,10 +16,10 @@ type Packet struct {
 	ElapsedSince  uint16
 	Flags         uint16
 
-	ClientAddress   uint32
-	ServerAddress   uint32
-	AssignedAddress uint32
-	GatewayAddress  uint32
+	ClientAddress  uint32
+	YourAddress    uint32
+	ServerAddress  uint32
+	GatewayAddress uint32
 
 	ClientMAC []byte
 	Hostname  []byte

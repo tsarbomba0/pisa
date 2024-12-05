@@ -139,12 +139,12 @@ func main() {
 			// Client sends DHCP discover
 			switch packet.DHCPAction {
 			case 1:
-				log.Println(packet.StringMAC + ": Got DHCPDiscover, sent DHCPOffer")
+				log.Println("Received DHCPDISCOVER from ", packet.StringMAC, ".Sending DHCPOFFER")
 				err := Server.SendDHCPOffer(packet)
 				util.NonFatalError(err)
 			// Client sends DHCP request
 			case 3:
-				log.Println(packet.StringMAC + ": Got DHCPRequest, sent DHCPAck")
+				log.Println("Received DHCPREQUEST from ", packet.StringMAC, ".Sending DHCPOFFER")
 				err := Server.SendDHCPAck(packet)
 				util.NonFatalError(err)
 			}
